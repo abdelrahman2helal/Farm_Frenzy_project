@@ -4,6 +4,9 @@
 #include <iostream>
 #include <windows.h> 
 #include <random>
+#include <vector>
+#include <algorithm>
+#include <fstream>
 
 Game::Game()
 {
@@ -110,6 +113,78 @@ void Game::warehouse() const    // Draw the warehouse in the upper right corner 
 	window* pWind = getWind();  
 	pWind->DrawImage("images\\warehouse.jpg", 550, 100, 110, 110);
 
+}
+
+void Game::saveScore()
+{
+	// Read existing scores
+	ifstream inFile("leaderboard.txt");
+	vector<pair<string, int>> scores;
+	string name;
+	int score;
+	while (inFile >> name >> score)
+		scores.push_back({ name, score });
+	inFile.close();
+
+	// Add current score
+	scores.push_back({ username, budget });
+
+	// Sort by score descending
+	sort(scores.begin(), scores.end(), [](auto& a, auto& b) {
+		return a.second > b.second;
+		});
+
+	// Keep top 10
+	if (scores.size() > 10)
+		scores.resize(10);
+
+	// Write back
+	ofstream outFile("leaderboard.txt");
+	for (auto& s : scores)
+		outFile << s.first << " " << s.second << "\n";
+	outFile.close();
+}
+
+void Game::showLeaderboard()
+{
+	window* lWind = new window(400, 500, 400, 150);
+	lWind->SetBrush(color(0, 80, 0));
+	lWind->SetPen(color(0, 80, 0), 1);
+	lWind->DrawRectangle(0, 0, 400, 500);
+
+	lWind->SetPen(YELLOW, 1);
+	lWind->SetFont(24, BOLD, BY_NAME, "Arial");
+	lWind->DrawString(120, 10, "LEADERBOARD");
+
+	lWind->SetPen(YELLOW, 2);
+	lWind->DrawLine(20, 45, 380, 45);
+
+	ifstream inFile("leaderboard.txt");
+	string name;
+	int score;
+	int rank = 1;
+	int y = 60;
+	while (inFile >> name >> score && rank <= 10)
+	{
+		string line = to_string(rank) + ". " + name + " - $" + to_string(score);
+		if (name == username)
+			lWind->SetPen(YELLOW, 1);  // highlight current player
+		else
+			lWind->SetPen(WHITE, 1);
+		lWind->SetFont(18, BOLD, BY_NAME, "Arial");
+		lWind->DrawString(20, y, line);
+		y += 35;
+		rank++;
+	}
+	inFile.close();
+
+	lWind->SetPen(WHITE, 1);
+	lWind->SetFont(16, PLAIN, BY_NAME, "Arial");
+	lWind->DrawString(120, 460, "Click to close");
+
+	int wx, wy;
+	lWind->WaitMouseClick(wx, wy);
+	delete lWind;
 }
 
 void Game::openWarehouse()
@@ -309,6 +384,11 @@ window* Game::getWind() const
 
 void Game::go()
 {
+	printMessage("Enter your name and press ENTER:");
+	pWind->UpdateBuffer();
+	username = getSrting();
+
+
 	int x, y;
 	bool isExit = false;
 
@@ -397,6 +477,9 @@ void Game::go()
 			if (timer == 0)
 			{
 				printMessage("TIME'S UP! You lose!");
+				Sleep(2000);
+				saveScore();
+				showLeaderboard();
 				break;
 			}
 		}

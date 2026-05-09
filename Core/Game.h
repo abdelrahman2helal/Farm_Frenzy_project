@@ -34,6 +34,9 @@ public:
 	bool isPaused = false;
 	void spawnWolf();
 	void addProduct(Product* p);
+	string username;
+	void saveScore();
+	void showLeaderboard();
 	
 	Game();
 	~Game();
