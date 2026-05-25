@@ -28,19 +28,7 @@ Game::Game()
 	//2 - create and draw the toolbar
 	createToolbar();
 	createBudgetbar();
-	//3 - create and draw the backgroundPlayingArea
-
-
-	//4- Create the Plane
 	warehouse();
-
-	//5- Create the Bullet
-	//TODO: Add code to create and draw the Bullet
-
-	//6- Create the enemies
-	//TODO: Add code to create and draw enemies in random places
-
-	//7- Create and clear the status bar
 	clearStatusBar();
 
 	animalList = new Animal * [50];
@@ -300,6 +288,91 @@ void Game::openWarehouse()
 	delete wWind;
 }
 
+void Game::showUsernameWindow()
+{
+	window* uWind = new window(500, 300, 350, 250);
+
+	// Background
+	uWind->SetBrush(color(0, 80, 0));
+	uWind->SetPen(color(0, 80, 0), 1);
+	uWind->DrawRectangle(0, 0, 500, 300);
+
+	// Title bar
+	uWind->SetBrush(color(0, 50, 0));
+	uWind->SetPen(color(0, 50, 0), 1);
+	uWind->DrawRectangle(0, 0, 500, 70);
+
+	// Title
+	uWind->SetPen(YELLOW, 1);
+	uWind->SetFont(28, BOLD, BY_NAME, "Arial");
+	uWind->DrawString(120, 18, "FARM FRENZY");
+
+	// Divider
+	uWind->SetPen(YELLOW, 2);
+	uWind->DrawLine(20, 75, 480, 75);
+
+	// Welcome text
+	uWind->SetPen(WHITE, 1);
+	uWind->SetFont(18, PLAIN, BY_NAME, "Arial");
+	uWind->DrawString(50, 100, "Welcome! Please enter your name:");
+
+	// Input box background
+	uWind->SetBrush(WHITE);
+	uWind->SetPen(YELLOW, 2);
+	uWind->DrawRectangle(50, 130, 450, 175);
+
+	// Input box text
+	uWind->SetPen(BLACK, 1);
+	uWind->SetFont(20, BOLD, BY_NAME, "Arial");
+	uWind->DrawString(60, 143, "Type and press ENTER");
+
+	// Start button
+	uWind->SetBrush(color(255, 165, 0));
+	uWind->SetPen(color(200, 120, 0), 2);
+	uWind->DrawRectangle(175, 210, 325, 260, FILLED, 10, 10);
+	uWind->SetPen(WHITE, 1);
+	uWind->SetFont(20, BOLD, BY_NAME, "Arial");
+	uWind->DrawString(195, 225, "START GAME");
+
+	// Get username using keyboard
+	string name = "";
+	char key;
+	keytype ktype;
+	uWind->FlushKeyQueue();
+
+	while (true)
+	{
+		// Clear input box
+		uWind->SetBrush(WHITE);
+		uWind->SetPen(YELLOW, 2);
+		uWind->DrawRectangle(50, 130, 450, 175);
+
+		// Show current input
+		uWind->SetPen(BLACK, 1);
+		uWind->SetFont(20, BOLD, BY_NAME, "Arial");
+		uWind->DrawString(60, 143, name + "_");
+
+		ktype = uWind->WaitKeyPress(key);
+
+		if (ktype == ESCAPE)
+		{
+			name = "Player";
+			break;
+		}
+		if (key == 13)  // ENTER
+			break;
+		if (key == 8 && name.size() > 0)  // BACKSPACE
+			name.resize(name.size() - 1);
+		else if (key != 8)
+			name += key;
+	}
+
+	if (name.empty()) name = "Player";
+	username = name;
+
+	delete uWind;
+}
+
 void Game::spawnWolf()
 {
 	std::random_device rd1;
@@ -316,6 +389,16 @@ void Game::spawnWolf()
 
 	animalList[animalListSize] = new Wolf(this, p, 70, 70, "images\\wolf.jpg");
 	animalListSize++;
+}
+
+void Game::trySpawnWolf(time_t now)
+{
+	int interval = (level == 1) ? 30 : (level == 2) ? 20 : 10;
+	if (now - lastWolfSpawnTime >= interval)
+	{
+		lastWolfSpawnTime = now;
+		spawnWolf();
+	}
 }
 
 void Game::createToolbar() 
@@ -337,7 +420,6 @@ void Game::createBudgetbar()
 	gameBudgetbar = new Budgetbar(this, budgetbarUpperleft, 0, config.toolBarHeight);
 	gameBudgetbar->draw();
 }
-
 
 void Game::clearBudget() const
 {
@@ -375,18 +457,177 @@ void Game::printMessage(string msg) const
 
 }
 
+void Game::updateStatusBar()
+{
+	int count = 0;
+	for (int i = 0; i < animalListSize; i++)
+		if (animalList[i] != nullptr && dynamic_cast<Wolf*>(animalList[i]) == nullptr)
+			count++;
+	printMessage("Timer: " + to_string(timer) +
+		" | Goal: " + to_string(goal) +
+		" | Level: " + to_string(level) +
+		" | Animals: " + to_string(count));
+}
+
+bool Game::checkLevelUp()
+{
+	static const int thresholds[] = { 0, 2100, 2300, 2500, 2700, 2900 };
+	static const string messages[] = { "", "Level 2 reached!", "Level 3 reached!",
+										  "Level 4 reached!", "Level 5 reached!" };
+
+	if (level >= 5 && budget >= thresholds[5])
+	{
+		printMessage("YOU WIN! Congratulations!");
+		pWind->UpdateBuffer();
+		Sleep(3000);
+		saveScore();
+		showLeaderboard();
+		return true;  // signal exit
+	}
+
+	if (level < 5 && budget >= thresholds[level])
+	{
+		level++;
+		timer = 180 + (level - 1) * 120;
+		printMessage(messages[level - 1]);
+		Sleep(2000);
+	}
+
+	return false;
+}
+
+void Game::update()
+{
+	for (int i = 0; i < animalListSize; i++)
+	{
+		if (animalList[i] == nullptr) continue;
+		animalList[i]->moveStep();
+
+		for (int j = 0; j < foodListSize; j++)
+		{
+			if (foodList[j] == nullptr || foodList[j]->isEmpty()) continue;
+			if (animalList[i]->getRefPoint().x < foodList[j]->getRefPoint().x + foodList[j]->getWidth() &&
+				animalList[i]->getRefPoint().x + animalList[i]->getWidth() > foodList[j]->getRefPoint().x &&
+				animalList[i]->getRefPoint().y < foodList[j]->getRefPoint().y + foodList[j]->getHeight() &&
+				animalList[i]->getRefPoint().y + animalList[i]->getHeight() > foodList[j]->getRefPoint().y)
+			{
+				foodList[j]->decrease();
+				animalList[i]->productCounter += 2;
+				if (animalList[i]->productCounter >= animalList[i]->maxCounter)
+				{
+					animalList[i]->productCounter = 5;
+					Product* prod = animalList[i]->produceProduct();
+					if (prod != nullptr) addProduct(prod);
+				}
+			}
+		}
+
+		Wolf* wolf = dynamic_cast<Wolf*>(animalList[i]);
+		if (wolf == nullptr) continue;
+		for (int j = 0; j < animalListSize; j++)
+		{
+			if (animalList[j] == nullptr || i == j) continue;
+			if (dynamic_cast<Wolf*>(animalList[j]) != nullptr) continue;
+			if (wolf->getRefPoint().x < animalList[j]->getRefPoint().x + animalList[j]->getWidth() &&
+				wolf->getRefPoint().x + wolf->getWidth() > animalList[j]->getRefPoint().x &&
+				wolf->getRefPoint().y < animalList[j]->getRefPoint().y + animalList[j]->getHeight() &&
+				wolf->getRefPoint().y + wolf->getHeight() > animalList[j]->getRefPoint().y)
+			{
+				delete animalList[j];
+				animalList[j] = nullptr;
+			}
+		}
+	}
+}
+
+void Game::draw()
+{
+	pWind->DrawImage("images\\background.jpg", 0, 2 * config.toolBarHeight,
+		config.windWidth, config.windHeight - config.statusBarHeight - 2 * config.toolBarHeight);
+	warehouse();
+	for (int i = 0; i < productListSize; i++)
+		if (productList[i] != nullptr && !productList[i]->isCollected)
+			productList[i]->draw();
+	for (int i = 0; i < foodListSize; i++)
+		if (foodList[i] != nullptr && !foodList[i]->isEmpty())
+			foodList[i]->draw();
+	for (int i = 0; i < animalListSize; i++)
+		if (animalList[i] != nullptr)
+			animalList[i]->draw();
+	pWind->UpdateBuffer();
+}
+
+bool Game::tryClickWolf(int x, int y)
+{
+	for (int i = 0; i < animalListSize; i++)
+	{
+		if (animalList[i] == nullptr) continue;
+		Wolf* wolf = dynamic_cast<Wolf*>(animalList[i]);
+		if (wolf == nullptr) continue;
+		if (x >= wolf->getRefPoint().x && x <= wolf->getRefPoint().x + wolf->getWidth() &&
+			y >= wolf->getRefPoint().y && y <= wolf->getRefPoint().y + wolf->getHeight())
+		{
+			wolf->clickCount++;
+			if (wolf->clickCount >= 5)
+			{
+				delete animalList[i];
+				animalList[i] = nullptr;
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Game::tryCollectProduct(int x, int y)
+{
+	for (int i = 0; i < productListSize; i++)
+	{
+		if (productList[i] == nullptr || productList[i]->isCollected) continue;
+		if (x >= productList[i]->getRefPoint().x && x <= productList[i]->getRefPoint().x + productList[i]->getWidth() &&
+			y >= productList[i]->getRefPoint().y && y <= productList[i]->getRefPoint().y + productList[i]->getHeight())
+		{
+			productList[i]->isCollected = true;
+			if (productList[i]->type == EGG) warehouseEggs++;
+			else if (productList[i]->type == MILK) warehouseMilk++;
+			return true;
+		}
+	}
+	return false;
+}
+
+void Game::tryPlaceFood(int x, int y)
+{
+	if (budget >= 20)
+	{
+		budget -= 20;
+		clearBudget();
+		string budget_string = "BUDGET = $" + to_string(budget) + " | Animals buying: $100 | Water buying: $20";
+		printBudget(budget_string);
+		point p; p.x = x; p.y = y;
+		foodList[foodListSize++] = new FoodArea(this, p, 80, 80, "images\\grass.jpg");
+	}
+}
+
+void Game::handleMouseClick(int x, int y)
+{
+	if (tryClickWolf(x, y)) return;
+	if (tryCollectProduct(x, y)) return;
+	if (y < config.toolBarHeight) { gameToolbar->handleClick(x, y); return; }
+	if (y < 2 * config.toolBarHeight) { gameBudgetbar->handleClick(x, y); return; }
+	if (x >= 550 && x <= 660 && y >= 100 && y <= 210) { openWarehouse(); return; }
+	tryPlaceFood(x, y);
+}
 
 window* Game::getWind() const
 {
 	return pWind;
 }
 
-
 void Game::go()
 {
-	printMessage("Enter your name and press ENTER:");
 	pWind->UpdateBuffer();
-	username = getSrting();
+	showUsernameWindow();
 
 
 	int x, y;
@@ -402,7 +643,7 @@ void Game::go()
 
 	do
 	{
-		
+
 		// ---- Timer logic ----
 		time_t now = time(0);
 		if (!isPaused)  // only update if not paused
@@ -422,232 +663,33 @@ void Game::go()
 							animalList[i]->incrementCounter();
 					}
 
-
-				int wolfSpawnInterval;
-				if (level == 1) wolfSpawnInterval = 30;  // every 30 seconds
-				else if (level == 2) wolfSpawnInterval = 20; // every 20 seconds
-				else wolfSpawnInterval = 10; // every 10 seconds
-
-				if (now - lastWolfSpawnTime >= wolfSpawnInterval)
-				{
-					lastWolfSpawnTime = now;
-					spawnWolf();
-				}
-
-				// Only update status bar once per second
-				string status = "Timer: " + to_string(timer) +
-					" | Goal: " + to_string(goal) +
-					" | Level: " + to_string(level) +
-					" | Animals: " + to_string(animalCount);
-				printMessage(status);
-				// Check if budget goal reached to increase level
-				if (level == 1 && budget >= 2100)
-				{
-					level++;
-					printMessage("Level 2 reached! Goal: $4000");
-					Sleep(2000);
-				}
-				else if (level == 2 && budget >= 2300)
-				{
-					level++;
-					printMessage("Level 3 reached! Goal: $5000");
-					Sleep(2000);
-				}
-				else if (level == 3 && budget >= 2500)
-				{
-					level++;
-					printMessage("Level 4 reached! Goal: $8000");
-					Sleep(2000);
-				}
-				else if (level == 4 && budget >= 2700)
-				{
-					level++;
-					printMessage("Level 5 reached! Goal: $10000");
-					Sleep(2000);
-				}
-				else if (level == 5 && budget >= 2900)
-				{
-					printMessage("YOU WIN! Congratulations!");
-					Sleep(3000);
-					isExit = true;
-				}
-			}
-
-
-			if (timer == 0)
-			{
-				printMessage("TIME'S UP! You lose!");
-				Sleep(2000);
-				saveScore();
-				showLeaderboard();
-				break;
+				trySpawnWolf(now);
+				updateStatusBar();
+				if (checkLevelUp()) { isExit = true; }
 			}
 		}
+		if (timer == 0 && !isGameOver)
+		{
+			isGameOver = true;
+			printMessage("TIME'S UP! You lose!");
+			pWind->UpdateBuffer();
+			Sleep(2000);
+			saveScore();
+			showLeaderboard();
+			isExit = true;
+		}
+
 		// ---- Non-blocking mouse check ----
-		// ---- Non-blocking mouse check ----
+		int x, y;
 		clicktype ct = pWind->GetMouseClick(x, y);
 		if (ct == LEFT_CLICK || ct == RIGHT_CLICK)
-		{
-			// Check if a wolf was clicked
-			bool wolfClicked = false;
-			for (int i = 0; i < animalListSize; i++)
-			{
-				if (animalList[i] != nullptr)
-				{
-					Wolf* wolf = dynamic_cast<Wolf*>(animalList[i]);
-					if (wolf != nullptr)
-					{
-						if (x >= wolf->getRefPoint().x &&
-							x <= wolf->getRefPoint().x + wolf->getWidth() &&
-							y >= wolf->getRefPoint().y &&
-							y <= wolf->getRefPoint().y + wolf->getHeight())
-						{
-							wolf->clickCount++;
-							cout << "Wolf clicked! Count: " << wolf->clickCount << endl;
-							wolfClicked = true;
-							if (wolf->clickCount >= 5)
-							{
-								delete animalList[i];
-								animalList[i] = nullptr;
-							}
-							break;
-						}
-					}
-				}
-			}
+			handleMouseClick(x, y);
 
-			if (!wolfClicked)
-			{
-				// check if a product was clicked
-				bool productClicked = false;
-				for (int i = 0; i < productListSize; i++)
-				{
-					if (productList[i] != nullptr && !productList[i]->isCollected)
-					{
-						if (x >= productList[i]->getRefPoint().x &&
-							x <= productList[i]->getRefPoint().x + productList[i]->getWidth() &&
-							y >= productList[i]->getRefPoint().y &&
-							y <= productList[i]->getRefPoint().y + productList[i]->getHeight())
-						{
-							productList[i]->isCollected = true;
-							if (productList[i]->type == EGG)
-								warehouseEggs++;
-							else if (productList[i]->type == MILK)
-								warehouseMilk++;
-							productClicked = true;
-							break;
-						}
-					}
-				}
-				if (!productClicked)
-				{
-					if (y >= 0 && y < config.toolBarHeight)
-						isExit = gameToolbar->handleClick(x, y);
-					else if (y >= config.toolBarHeight && y < 2 * config.toolBarHeight)
-						isExit = gameBudgetbar->handleClick(x, y);
-					else if (x >= 550 && x <= 660 && y >= 100 && y <= 210)
-						openWarehouse();
-					else  // clicked on field
-					{
-						if (budget >= 20)
-						{
-							budget -= 20;
-							clearBudget();
-							string budget_string = "BUDGET = $" + to_string(budget) + " | Animals buying: $100 | Water buying: $20";
-							printBudget(budget_string);
-
-							point p; p.x = x; p.y = y;
-							foodList[foodListSize] = new FoodArea(this, p, 80, 80, "images\\grass.jpg");
-							foodListSize++;
-						}
-					}
-				}
-			}
-		}
-			
-
-		pWind->DrawImage("images\\background.jpg", 0, 2 * config.toolBarHeight,
-				config.windWidth, config.windHeight - config.statusBarHeight - 2 * config.toolBarHeight);
-
-		warehouse();
-		
-		// Draw products (eggs/milk)
-		for (int i = 0; i < productListSize; i++)
-			if (productList[i] != nullptr && !productList[i]->isCollected)
-				productList[i]->draw();
-	
-		for (int i = 0; i < foodListSize; i++)
-			if (foodList[i] != nullptr && !foodList[i]->isEmpty())
-				foodList[i]->draw();
-
-
-
-		for (int i = 0; i < animalListSize; i++)
-		{
-			if (animalList[i] != nullptr)
-			{
-				if (animalList[i]->isDead)
-				{
-					delete animalList[i];
-					animalList[i] = nullptr;
-					continue;
-				}
-				if (!isPaused)
-				{
-					animalList[i]->moveStep();
-
-					for (int j = 0; j < foodListSize; j++)
-					{
-						if (foodList[j] != nullptr && !foodList[j]->isEmpty())
-						{
-							if (animalList[i]->getRefPoint().x < foodList[j]->getRefPoint().x + foodList[j]->getWidth() &&
-								animalList[i]->getRefPoint().x + animalList[i]->getWidth() > foodList[j]->getRefPoint().x &&
-								animalList[i]->getRefPoint().y < foodList[j]->getRefPoint().y + foodList[j]->getHeight() &&
-								animalList[i]->getRefPoint().y + animalList[i]->getHeight() > foodList[j]->getRefPoint().y)
-							{
-								foodList[j]->decrease();
-								animalList[i]->productCounter += 2;  // eating increases counter
-								if (animalList[i]->productCounter >= animalList[i]->maxCounter)
-								{
-									animalList[i]->productCounter = 5;  // reset after producing
-									Animal* a = animalList[i];
-									Product* prod = a->produceProduct();
-									if (prod != nullptr)
-										addProduct(prod);
-								}
-
-							}
-						}
-					}
-
-					Wolf* wolf = dynamic_cast<Wolf*>(animalList[i]);
-					if (wolf != nullptr)
-					{
-						for (int j = 0; j < animalListSize; j++)
-						{
-							if (animalList[j] != nullptr && i != j)
-							{
-								Wolf* otherWolf = dynamic_cast<Wolf*>(animalList[j]);
-								if (otherWolf == nullptr)
-								{
-									if (wolf->getRefPoint().x < animalList[j]->getRefPoint().x + animalList[j]->getWidth() &&
-										wolf->getRefPoint().x + wolf->getWidth() > animalList[j]->getRefPoint().x &&
-										wolf->getRefPoint().y < animalList[j]->getRefPoint().y + animalList[j]->getHeight() &&
-										wolf->getRefPoint().y + wolf->getHeight() > animalList[j]->getRefPoint().y)
-									{
-										delete animalList[j];
-										animalList[j] = nullptr;
-									}
-								}
-							}
-						}
-					}
-				}
-				animalList[i]->draw(); // always draw
-			}
-		}
+		if (!isPaused) update();
+		draw();
+		Sleep(300);
 		pWind->UpdateBuffer();
 		Sleep(300);
-
+	 
 	} while (!isExit);
 }

@@ -69,10 +69,6 @@ enum ANIMAL_ICONS //The icons of the toolbar (you should add more icons)
 	ICON_CHICK,
 	ICON_COW,
 	ICON_WATER,
-	//TODO: Add more icons names here
-
-	//Cow icon
-
 	ANIMAL_COUNT		//no. of menu icons ==> This should be the last line in this enum
 };
 

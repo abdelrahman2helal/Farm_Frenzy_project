@@ -20,6 +20,7 @@ public:
 	FoodArea** foodList;
 	Product** productList;
 	time_t lastWolfSpawnTime;
+	string username;
 	int productListSize = 0;
 	int foodListSize = 0;
 	int animalListSize = 0;
@@ -30,14 +31,9 @@ public:
 	int animalCount;
 	int warehouseEggs = 0;
 	int warehouseMilk = 0;
-	void openWarehouse();
 	bool isPaused = false;
-	void spawnWolf();
-	void addProduct(Product* p);
-	string username;
-	void saveScore();
-	void showLeaderboard();
-	
+	bool isGameOver = false;
+
 	Game();
 	~Game();
 	clicktype getMouseClick(int& x, int& y) const; //Get coordinate where user clicks and returns click type (left/right)
@@ -47,10 +43,24 @@ public:
 	void createBudgetbar();
 	void clearBudget() const;
 	void warehouse() const;
+	void saveScore();
+	void showLeaderboard();
+	void showUsernameWindow();
+	void spawnWolf();
+	void openWarehouse();
+	void addProduct(Product* p);
 	void printBudget(string msg) const;
 	void clearStatusBar() const;	//Clears the status bar
 	void printMessage(string msg) const;	//Print a message on Status bar
+	void trySpawnWolf(time_t now);
+	void updateStatusBar();
+	bool checkLevelUp();
+	void handleMouseClick(int x, int y);
+	bool tryClickWolf(int x, int y);
+	bool tryCollectProduct(int x, int y);
+	void tryPlaceFood(int x, int y);
+	void update();   // all movement and collision logic
+	void draw();     // all rendering
 	void go() ;
 	window* getWind() const;		//returns a pointer to the graphics window
 };
-

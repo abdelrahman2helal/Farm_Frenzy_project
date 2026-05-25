@@ -11,50 +11,39 @@ Animal::Animal(Game* r_pGame, point r_point, int r_width, int r_height, string i
 	curr_vel.x = 4;
 	curr_vel.y = 4;
 	productCounter = 5;
-	maxCounter = 10; // default
-	isDead = false;
+	maxCounter = 10; 
+	
 }
 
 void Animal::draw() const
 {
-	//draw image of this object
-	cout << "Drawing animal, isDead: " << isDead << endl;
 	window* pWind = pGame->getWind();
 	pWind->DrawImage(image_path, RefPoint.x, RefPoint.y, width, height);
 
-	pWind->SetPen(BLACK, 1);
-	pWind->SetFont(16, BOLD, BY_NAME, "Arial");
-	pWind->DrawString(RefPoint.x + width / 2 - 5, RefPoint.y, to_string(productCounter));
+	// Bar background (red)
+	pWind->SetPen(RED, 1);
+	pWind->SetBrush(RED);
+	pWind->DrawRectangle(RefPoint.x, RefPoint.y - 10, RefPoint.x + width, RefPoint.y - 2);
 
+	// Bar fill (green) based on productCounter / maxCounter
+	float ratio = (float)productCounter / (float)maxCounter;
+	int fillWidth = (int)(width * ratio);
+	pWind->SetPen(GREEN, 1);
+	pWind->SetBrush(GREEN);
+	pWind->DrawRectangle(RefPoint.x, RefPoint.y - 10, RefPoint.x + fillWidth, RefPoint.y - 2);
 }
-
-
 
 void Animal::incrementCounter()
 {
-	if (isDead) return;
+	
 
 	productCounter--;  // decreases every second
 
 	if (productCounter <= 0)
 	{
-		isDead = true;  // dies when reaches 0
+		productCounter = 0;
 	}
 }
-
-// Chick produceProduct:
-Product* Chick::produceProduct()
-{
-	point p = { RefPoint.x, RefPoint.y };
-	return new Product(pGame, p, 30, 30, "images\\egg.jpg", EGG);
-}
-
-Product* Cow::produceProduct()
-{
-	point p = { RefPoint.x, RefPoint.y };
-	return new Product(pGame, p, 30, 30, "images\\milk.jpg", MILK);
-}
-
 
 
 Chick::Chick(Game* r_pGame, point r_point, int r_width, int r_height, string img_path) : Animal(r_pGame, r_point, r_width, r_height, img_path)
@@ -94,6 +83,13 @@ void Chick::moveStep()
 	cout << "Icon Chick Clicked" << endl;
 }
 
+Product* Chick::produceProduct()
+{
+	point p = { RefPoint.x, RefPoint.y };
+	return new Product(pGame, p, 30, 30, "images\\egg.jpg", EGG);
+}
+
+
 Cow::Cow(Game* r_pGame, point r_point, int r_width, int r_height, string img_path) : Animal(r_pGame, r_point, r_width, r_height, img_path)
 {
 	maxCounter = 15; // 15 seconds
@@ -127,6 +123,13 @@ void Cow::moveStep()
 
 }
 
+Product* Cow::produceProduct()
+{
+	point p = { RefPoint.x, RefPoint.y };
+	return new Product(pGame, p, 30, 30, "images\\milk.jpg", MILK);
+}
+
+
 Wolf::Wolf(Game* r_pGame, point r_point, int r_width, int r_height, string img_path) : Animal(r_pGame, r_point, r_width, r_height, img_path)
 {
 	clickCount = 0;
@@ -151,4 +154,23 @@ void Wolf::moveStep()
 		curr_vel.y = -curr_vel.y;
 
 	cout << "Wolf moving" << endl;
+}
+
+
+void Wolf::draw() const
+{
+	window* pWind = pGame->getWind();
+	pWind->DrawImage(image_path, RefPoint.x, RefPoint.y, width, height);
+
+	// Bar background (gray)
+	pWind->SetPen(GRAY, 1);
+	pWind->SetBrush(GRAY);
+	pWind->DrawRectangle(RefPoint.x, RefPoint.y - 10, RefPoint.x + width, RefPoint.y - 2);
+
+	// Bar fill (red) based on clickCount / 5
+	float ratio = (float)clickCount / 5.0f;
+	int fillWidth = (int)(width * ratio);
+	pWind->SetPen(RED, 1);
+	pWind->SetBrush(RED);
+	pWind->DrawRectangle(RefPoint.x, RefPoint.y - 10, RefPoint.x + fillWidth, RefPoint.y - 2);
 }
